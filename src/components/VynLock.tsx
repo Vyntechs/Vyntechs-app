@@ -25,9 +25,10 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
   };
 
   const handleDotStart = (index: number) => {
+    // ✅ Only start if finger is on a dot
     setIsDrawing(true);
     setPattern([index]);
-    setFingerPos(null); // reset finger tracker
+    setFingerPos(null);
   };
 
   const handleDotEnter = (index: number) => {
@@ -57,7 +58,6 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
     };
   };
 
-  // 🔹 Track finger drag globally
   useEffect(() => {
     const handleTouchMove = (e: TouchEvent) => {
       if (!isDrawing || !containerRef.current) return;
@@ -66,13 +66,15 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
       const x = touch.clientX - rect.left;
       const y = touch.clientY - rect.top;
 
-      setFingerPos({ x, y }); // live update finger pos for line
+      setFingerPos({ x, y });
 
       const col = Math.floor((x / rect.width) * size);
       const row = Math.floor((y / rect.height) * size);
       const index = row * size + col;
 
-      if (index >= 0 && index < size * size) handleDotEnter(index);
+      if (index >= 0 && index < size * size) {
+        handleDotEnter(index);
+      }
     };
 
     window.addEventListener("touchmove", handleTouchMove);
@@ -113,7 +115,7 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
           );
         })}
 
-        {/* 👆 Live finger line */}
+        {/* Live finger line */}
         {isDrawing && fingerPos && pattern.length > 0 && (
           <line
             x1={getDotPosition(pattern[pattern.length - 1]).x}
@@ -142,8 +144,8 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
             key={i}
             onMouseDown={() => handleDotStart(i)}
             onMouseEnter={() => handleDotEnter(i)}
-            onTouchStart={() => handleDotStart(i)}
-            className={`flex items-center justify-center w-12 h-12 rounded-full border-2 transition-colors
+            onTouchStart={() => handleDotStart(i)} // ✅ only start if a dot is touched
+            className={`flex items-center justify-center rounded-full border-2 transition-colors
               ${
                 pattern.includes(i)
                   ? "bg-indigo-500 border-indigo-400"
