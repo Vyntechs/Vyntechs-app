@@ -14,7 +14,7 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
 
   const spacing = 80;
   const dotSize = 48;
-  const hitRadius = 30; // 🔹 how close finger must be to count as "touching" a dot
+  const hitRadius = 30;
 
   const grid = Array.from({ length: size * size }, (_, i) => i);
 
@@ -55,18 +55,19 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
     setFingerPos(null);
   };
 
-  // 🔹 Track global finger movement
+  // 🔹 Unified pointer handler (mouse, touch, pen)
   useEffect(() => {
-    const handleTouchMove = (e: TouchEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       if (!isDrawing || !containerRef.current) return;
 
+      e.preventDefault(); // stop page scroll on touch
+
       const rect = containerRef.current.getBoundingClientRect();
-      const touch = e.touches[0];
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
       setFingerPos({ x, y });
 
-      // Check which dot is nearest
+      // check nearest dot
       grid.forEach((i) => {
         const pos = getDotPosition(i);
         const dx = x - pos.x;
@@ -78,19 +79,17 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
       });
     };
 
-    window.addEventListener("touchmove", handleTouchMove);
-    window.addEventListener("mouseup", handleRelease);
-    window.addEventListener("touchend", handleRelease);
+    window.addEventListener("pointermove", handlePointerMove, { passive: false });
+    window.addEventListener("pointerup", handleRelease);
 
     return () => {
-      window.removeEventListener("touchmove", handleTouchMove);
-      window.removeEventListener("mouseup", handleRelease);
-      window.removeEventListener("touchend", handleRelease);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handleRelease);
     };
   }, [isDrawing, pattern]);
 
   return (
-    <div className="relative select-none" ref={containerRef}>
+    <div className="relative select-none touch-none" ref={containerRef}>
       {/* SVG lines */}
       <svg
         className="absolute top-0 left-0 pointer-events-none"
@@ -140,8 +139,7 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
         {grid.map((i) => (
           <div
             key={i}
-            onMouseDown={() => handleDotStart(i)}
-            onTouchStart={() => handleDotStart(i)}
+            onPointerDown={() => handleDotStart(i)}
             className={`flex items-center justify-center rounded-full border-2 transition-colors
               ${pattern.includes(i)
                 ? "bg-indigo-500 border-indigo-400"
