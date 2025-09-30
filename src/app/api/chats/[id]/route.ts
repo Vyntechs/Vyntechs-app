@@ -2,40 +2,36 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { jwtVerify } from "jose";
+import { cookies } from "next/headers";
 
 const prisma = new PrismaClient();
 const secret = new TextEncoder().encode(process.env.JWT_SECRET || "dev-secret");
 
-async function getUserFromToken(req: Request) {
-  const token = req.headers
-    .get("cookie")
-    ?.split(";")
-    .find((c) => c.trim().startsWith("auth_token="))
-    ?.split("=")[1];
-
-  if (!token) return null;
-
+// 🔐 Helper – extract & verify userId from JWT
+async function getUserIdFromRequest(): Promise<string | null> {
   try {
+    const token = cookies().get("auth_token")?.value;
+    if (!token) return null;
+
     const { payload } = await jwtVerify(token, secret);
-    return payload.sub as string; // user.id
-  } catch {
+    return payload.sub as string;
+  } catch (err) {
+    console.error("❌ JWT verification failed:", err);
     return null;
   }
 }
 
+// 📡 GET – fetch single chat
 export async function GET(
   req: Request,
-  { params }: { params: Promise<{ id: string }> } // ✅ must be awaited
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
+    const { id } = params;
+    const userId = await getUserIdFromRequest();
 
-    const userId = await getUserFromToken(req);
     if (!userId) {
-      return NextResponse.json(
-        { ok: false, error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
     const chat = await prisma.chat.findUnique({
@@ -44,19 +40,16 @@ export async function GET(
         id: true,
         title: true,
         createdAt: true,
-        messages: true, // string column with JSON inside
+        messages: true,
         userId: true,
       },
     });
 
     if (!chat || chat.userId !== userId) {
-      return NextResponse.json(
-        { ok: false, error: "Not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
     }
 
-    // 🔒 Safe parse messages into an array
+    // 🔒 Parse messages safely
     let parsedMessages: any[] = [];
     try {
       const raw = typeof chat.messages === "string" ? chat.messages : "[]";
@@ -70,10 +63,7 @@ export async function GET(
               typeof m.role === "string" &&
               (typeof m.content === "string" || typeof m.content === "object")
           )
-          .map((m) => ({
-            role: m.role,
-            content: m.content,
-          }));
+          .map((m) => ({ role: m.role, content: m.content }));
       }
     } catch {
       parsedMessages = [];
@@ -88,10 +78,7 @@ export async function GET(
 
     return NextResponse.json({ ok: true, chat: safeChat });
   } catch (err) {
-    console.error("Chat fetch error:", err);
-    return NextResponse.json(
-      { ok: false, error: "Server error" },
-      { status: 500 }
-    );
+    console.error("❌ Chat fetch error:", err);
+    return NextResponse.json({ ok: false, error: "Server error" }, { status: 500 });
   }
 }

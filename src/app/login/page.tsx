@@ -14,11 +14,14 @@ export default function LoginPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await fetch("/api/chats", { credentials: "include" });
+        const res = await fetch("/api/chats", {
+          method: "GET",
+          credentials: "include", // ✅ ensure cookies are sent
+        });
         if (res.ok) {
           const data = await res.json();
           if (data.ok !== false) {
-            router.replace("/");  // ✅ send to root, not /home
+            router.replace("/"); // ✅ send to root, not /home
           }
         }
       } catch (err) {
@@ -34,6 +37,7 @@ export default function LoginPage() {
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include", // ✅ so cookie is saved in Safari
         body: JSON.stringify({ email, pattern }),
       });
 
@@ -41,12 +45,12 @@ export default function LoginPage() {
 
       if (data.ok) {
         setError("");
-        router.push("/");  // ✅ send to root after login
+        router.replace("/"); // ✅ safer than push, replaces history
       } else {
         setError("❌ Incorrect email or pattern, try again.");
       }
     } catch (err) {
-      console.error(err);
+      console.error("Login failed:", err);
       setError("⚠️ Server error. Please try again later.");
     }
   };
