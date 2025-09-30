@@ -2,24 +2,34 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { jwtVerify } from "jose";
-import { cookies } from "next/headers";
 
 const prisma = new PrismaClient();
 const secret = new TextEncoder().encode(process.env.JWT_SECRET || "dev-secret");
 
-// 🔐 Helper – extract & verify userId from JWT
-async function getUserIdFromRequest(): Promise<string | null> {
+// Read `auth_token` from the Cookie header
+function getTokenFromReq(req: Request): string | null {
+  const raw = req.headers.get("cookie");
+  if (!raw) return null;
+  const part = raw
+    .split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith("auth_token="));
+  if (!part) return null;
+  const value = part.slice("auth_token=".length);
   try {
-    const cookieStore = await cookies(); // ✅ await cookies()
-    const token = cookieStore.get("auth_token")?.value;
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 
-    if (!token) {
-      console.warn("⚠️ No auth_token cookie found");
-      return null;
-    }
-
+// Verify JWT and return userId
+async function getUserIdFromRequest(req: Request): Promise<string | null> {
+  try {
+    const token = getTokenFromReq(req);
+    if (!token) return null;
     const { payload } = await jwtVerify(token, secret);
-    return payload.sub as string;
+    return (payload.sub as string) ?? null;
   } catch (err) {
     console.error("❌ JWT verification failed:", err);
     return null;
@@ -27,10 +37,10 @@ async function getUserIdFromRequest(): Promise<string | null> {
 }
 
 // 📡 GET – list chats
-export async function GET() {
+export async function GET(req: Request) {
   console.log("📡 /api/chats GET called");
 
-  const userId = await getUserIdFromRequest();
+  const userId = await getUserIdFromRequest(req);
   if (!userId) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
@@ -49,7 +59,7 @@ export async function GET() {
 export async function POST(req: Request) {
   console.log("✏️ /api/chats POST called");
 
-  const userId = await getUserIdFromRequest();
+  const userId = await getUserIdFromRequest(req);
   if (!userId) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }

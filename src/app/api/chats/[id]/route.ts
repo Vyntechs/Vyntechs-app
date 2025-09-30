@@ -10,7 +10,8 @@ const secret = new TextEncoder().encode(process.env.JWT_SECRET || "dev-secret");
 // 🔐 Helper – extract & verify userId from JWT
 async function getUserIdFromRequest(): Promise<string | null> {
   try {
-    const token = cookies().get("auth_token")?.value;
+    const cookieStore = await cookies(); // ✅ await for Next.js 15
+    const token = cookieStore.get("auth_token")?.value;
     if (!token) return null;
 
     const { payload } = await jwtVerify(token, secret);
@@ -23,7 +24,7 @@ async function getUserIdFromRequest(): Promise<string | null> {
 
 // 📡 GET – fetch single chat
 export async function GET(
-  req: Request,
+  _req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
