@@ -1,14 +1,33 @@
 // src/app/login/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import VynLock from "../../components/VynLock";  // ✅ path ok
+import VynLock from "../../components/VynLock";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const router = useRouter();
+
+  // 🔒 Redirect if already logged in
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch("/api/chats", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok !== false) {
+            router.replace("/");  // ✅ send to root, not /home
+          }
+        }
+      } catch (err) {
+        console.warn("Auth check failed:", err);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
 
   const handleUnlock = async (pattern: string) => {
     try {
@@ -22,7 +41,7 @@ export default function LoginPage() {
 
       if (data.ok) {
         setError("");
-        router.push("/"); // middleware will allow access
+        router.push("/");  // ✅ send to root after login
       } else {
         setError("❌ Incorrect email or pattern, try again.");
       }

@@ -1,37 +1,30 @@
 // src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { jwtVerify } from "jose";
 
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+const secret = new TextEncoder().encode(process.env.JWT_SECRET || "dev-secret");
+
+export async function middleware(req: NextRequest) {
   const token = req.cookies.get("auth_token")?.value;
+  const { pathname } = req.nextUrl;
 
-  // ✅ Allow public routes (login, register, static assets)
-  const publicPaths = [
-    "/login",
-    "/register",
-    "/api/login",
-    "/api/register",
-    "/favicon.ico",
-    "/vyntechs-logo.png",
-  ];
-
-  if (publicPaths.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
-  }
-
-  // ✅ Redirect unauthenticated users to login
-  if (!token) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
-  }
-
-  // ✅ Prevent logged-in users from hitting /login or /register again
+  // ✅ If logged in and trying to access /login or /register → bounce home
   if (token && (pathname === "/login" || pathname === "/register")) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
+    try {
+      await jwtVerify(token, secret); // validate token
+      return NextResponse.redirect(new URL("/", req.url));
+    } catch {
+      // invalid/expired token → let them stay
+    }
+  }
+
+  // 🔒 Protect everything EXCEPT /login and /register
+  const publicPaths = ["/login", "/register"];
+  const isPublic = publicPaths.includes(pathname);
+
+  if (!token && !isPublic) {
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
   return NextResponse.next();
@@ -39,12 +32,7 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all routes except:
-     * - API routes (handled separately, except login/register)
-     * - Next.js internal paths (_next)
-     * - Static files
-     */
-    "/((?!_next|api/auth|.*\\..*).*)",
+    "/((?!_next|api|static|favicon.ico).*)", 
+    // protects all routes except Next.js internals, api, static, favicon
   ],
 };
