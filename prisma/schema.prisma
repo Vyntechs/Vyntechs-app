@@ -1,17 +1,16 @@
-// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
-  phone     String?  @unique
+  phone     String?  // ❌ removed @unique so null is allowed multiple times
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -32,7 +31,7 @@ model Chat {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   title     String?
-  messages  String     // 👈 JSON stored as string
-  user      User       @relation(fields: [userId], references: [id])
+  messages  String   // 👈 JSON stored as string
+  user      User     @relation(fields: [userId], references: [id])
   userId    String
 }
