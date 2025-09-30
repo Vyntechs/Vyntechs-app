@@ -9,14 +9,14 @@ interface VynLockProps {
 export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
   const [pattern, setPattern] = useState<number[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [fingerPos, setFingerPos] = useState<{ x: number; y: number } | null>(
-    null
-  );
-  const svgRef = useRef<SVGSVGElement>(null);
+  const [fingerPos, setFingerPos] = useState<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const spacing = 80;
   const dotSize = 48;
+  const hitRadius = 30; // 🔹 how close finger must be to count as "touching" a dot
+
+  const grid = Array.from({ length: size * size }, (_, i) => i);
 
   const getGridId = (index: number): number => {
     const row = Math.floor(index / size) + 1;
@@ -24,8 +24,16 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
     return row * 10 + col;
   };
 
+  const getDotPosition = (index: number) => {
+    const row = Math.floor(index / size);
+    const col = index % size;
+    return {
+      x: col * spacing + spacing / 2,
+      y: row * spacing + spacing / 2,
+    };
+  };
+
   const handleDotStart = (index: number) => {
-    // ✅ Only start if finger is on a dot
     setIsDrawing(true);
     setPattern([index]);
     setFingerPos(null);
@@ -47,34 +55,27 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
     setFingerPos(null);
   };
 
-  const grid = Array.from({ length: size * size }, (_, i) => i);
-
-  const getDotPosition = (index: number) => {
-    const row = Math.floor(index / size);
-    const col = index % size;
-    return {
-      x: col * spacing + spacing / 2,
-      y: row * spacing + spacing / 2,
-    };
-  };
-
+  // 🔹 Track global finger movement
   useEffect(() => {
     const handleTouchMove = (e: TouchEvent) => {
       if (!isDrawing || !containerRef.current) return;
+
       const rect = containerRef.current.getBoundingClientRect();
       const touch = e.touches[0];
       const x = touch.clientX - rect.left;
       const y = touch.clientY - rect.top;
-
       setFingerPos({ x, y });
 
-      const col = Math.floor((x / rect.width) * size);
-      const row = Math.floor((y / rect.height) * size);
-      const index = row * size + col;
-
-      if (index >= 0 && index < size * size) {
-        handleDotEnter(index);
-      }
+      // Check which dot is nearest
+      grid.forEach((i) => {
+        const pos = getDotPosition(i);
+        const dx = x - pos.x;
+        const dy = y - pos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist <= hitRadius) {
+          handleDotEnter(i);
+        }
+      });
     };
 
     window.addEventListener("touchmove", handleTouchMove);
@@ -92,7 +93,6 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
     <div className="relative select-none" ref={containerRef}>
       {/* SVG lines */}
       <svg
-        ref={svgRef}
         className="absolute top-0 left-0 pointer-events-none"
         width={size * spacing}
         height={size * spacing}
@@ -114,8 +114,6 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
             />
           );
         })}
-
-        {/* Live finger line */}
         {isDrawing && fingerPos && pattern.length > 0 && (
           <line
             x1={getDotPosition(pattern[pattern.length - 1]).x}
@@ -143,14 +141,11 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
           <div
             key={i}
             onMouseDown={() => handleDotStart(i)}
-            onMouseEnter={() => handleDotEnter(i)}
-            onTouchStart={() => handleDotStart(i)} // ✅ only start if a dot is touched
+            onTouchStart={() => handleDotStart(i)}
             className={`flex items-center justify-center rounded-full border-2 transition-colors
-              ${
-                pattern.includes(i)
-                  ? "bg-indigo-500 border-indigo-400"
-                  : "bg-gray-800 border-gray-500 hover:border-indigo-400"
-              }
+              ${pattern.includes(i)
+                ? "bg-indigo-500 border-indigo-400"
+                : "bg-gray-800 border-gray-500 hover:border-indigo-400"}
             `}
             style={{ width: dotSize, height: dotSize }}
           />
