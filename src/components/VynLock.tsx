@@ -2,28 +2,32 @@
 import { useState, useRef, useEffect } from "react";
 
 interface VynLockProps {
-  size?: number; // grid size (default 4x4)
+  size?: number;
   onPatternComplete: (pattern: string) => void;
 }
 
 export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
   const [pattern, setPattern] = useState<number[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [fingerPos, setFingerPos] = useState<{ x: number; y: number } | null>(
+    null
+  );
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const spacing = 80; // px between centers
-  const dotSize = 48; // px dot size
+  const spacing = 80;
+  const dotSize = 48;
 
-  // 🔹 Convert index → double-digit grid ID (11–44)
   const getGridId = (index: number): number => {
-    const row = Math.floor(index / size) + 1; // 1–4
-    const col = (index % size) + 1;           // 1–4
-    return row * 10 + col;                    // e.g. row 1 col 1 → 11
+    const row = Math.floor(index / size) + 1;
+    const col = (index % size) + 1;
+    return row * 10 + col;
   };
 
   const handleDotStart = (index: number) => {
     setIsDrawing(true);
     setPattern([index]);
+    setFingerPos(null); // reset finger tracker
   };
 
   const handleDotEnter = (index: number) => {
@@ -34,12 +38,12 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
 
   const handleRelease = () => {
     if (isDrawing && pattern.length > 0) {
-      // Convert drawn pattern → double-digit IDs string
       const converted = pattern.map(getGridId).join("-");
       onPatternComplete(converted);
     }
     setIsDrawing(false);
     setPattern([]);
+    setFingerPos(null);
   };
 
   const grid = Array.from({ length: size * size }, (_, i) => i);
@@ -53,19 +57,38 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
     };
   };
 
+  // 🔹 Track finger drag globally
   useEffect(() => {
-    const handleMouseUp = () => handleRelease();
-    window.addEventListener("mouseup", handleMouseUp);
-    window.addEventListener("touchend", handleMouseUp);
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isDrawing || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const touch = e.touches[0];
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
+
+      setFingerPos({ x, y }); // live update finger pos for line
+
+      const col = Math.floor((x / rect.width) * size);
+      const row = Math.floor((y / rect.height) * size);
+      const index = row * size + col;
+
+      if (index >= 0 && index < size * size) handleDotEnter(index);
+    };
+
+    window.addEventListener("touchmove", handleTouchMove);
+    window.addEventListener("mouseup", handleRelease);
+    window.addEventListener("touchend", handleRelease);
+
     return () => {
-      window.removeEventListener("mouseup", handleMouseUp);
-      window.removeEventListener("touchend", handleMouseUp);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("mouseup", handleRelease);
+      window.removeEventListener("touchend", handleRelease);
     };
   }, [isDrawing, pattern]);
 
   return (
-    <div className="relative select-none">
-      {/* SVG lines between dots */}
+    <div className="relative select-none" ref={containerRef}>
+      {/* SVG lines */}
       <svg
         ref={svgRef}
         className="absolute top-0 left-0 pointer-events-none"
@@ -89,9 +112,23 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
             />
           );
         })}
+
+        {/* 👆 Live finger line */}
+        {isDrawing && fingerPos && pattern.length > 0 && (
+          <line
+            x1={getDotPosition(pattern[pattern.length - 1]).x}
+            y1={getDotPosition(pattern[pattern.length - 1]).y}
+            x2={fingerPos.x}
+            y2={fingerPos.y}
+            stroke="#60a5fa"
+            strokeWidth="4"
+            strokeDasharray="6 4"
+            strokeLinecap="round"
+          />
+        )}
       </svg>
 
-      {/* Grid dots */}
+      {/* Dots */}
       <div
         className="grid gap-6"
         style={{
@@ -106,16 +143,6 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
             onMouseDown={() => handleDotStart(i)}
             onMouseEnter={() => handleDotEnter(i)}
             onTouchStart={() => handleDotStart(i)}
-            onTouchMove={(e) => {
-              const touch = e.touches[0];
-              const rect = (e.target as HTMLElement).getBoundingClientRect();
-              const x = touch.clientX - rect.left;
-              const y = touch.clientY - rect.top;
-              const col = Math.floor((x / rect.width) * size);
-              const row = Math.floor((y / rect.height) * size);
-              const index = row * size + col;
-              if (index >= 0 && index < size * size) handleDotEnter(index);
-            }}
             className={`flex items-center justify-center w-12 h-12 rounded-full border-2 transition-colors
               ${
                 pattern.includes(i)
@@ -124,10 +151,7 @@ export default function VynLock({ size = 4, onPatternComplete }: VynLockProps) {
               }
             `}
             style={{ width: dotSize, height: dotSize }}
-          >
-            {/* Optional: show ID inside dot for debugging */}
-            {/* <span className="text-xs text-gray-400">{getGridId(i)}</span> */}
-          </div>
+          />
         ))}
       </div>
     </div>
