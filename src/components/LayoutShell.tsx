@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Sidebar from "./Sidebar"; // ✅ correct import
+import Sidebar from "./Sidebar";
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -11,6 +11,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
       {/* Sidebar */}
       {sidebarOpen && (
         <div className="w-64 transition-all duration-300">
+          {/* ✅ onClose is now recognized in SidebarProps */}
           <Sidebar onClose={() => setSidebarOpen(false)} />
         </div>
       )}

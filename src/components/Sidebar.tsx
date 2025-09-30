@@ -19,31 +19,38 @@ interface Chat {
   createdAt: string;
 }
 
-export default function Sidebar() {
+interface SidebarProps {
+  onClose?: () => void; // ✅ optional close handler
+}
+
+export default function Sidebar({ onClose }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [open, setOpen] = useState(false); // 👈 replaces collapsed
+  const [collapsed, setCollapsed] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(true);
   const mounted = useRef(false);
 
   const fetchChats = async () => {
     setLoading(true);
     setErr(null);
+
     try {
       const res = await fetch("/api/chats", {
         method: "GET",
         credentials: "include",
         cache: "no-store",
       });
+
       if (!res.ok) {
         setErr("Failed to load chats");
         setChats([]);
         return;
       }
+
       const data = await res.json();
       if (data.ok && Array.isArray(data.chats)) {
         setChats(data.chats);
@@ -63,7 +70,10 @@ export default function Sidebar() {
   useEffect(() => {
     if (mounted.current) return;
     mounted.current = true;
-    setUserEmail(localStorage.getItem("user_email") || null);
+
+    const storedEmail = localStorage.getItem("user_email") || null;
+    setUserEmail(storedEmail);
+
     fetchChats();
   }, []);
 
@@ -80,31 +90,28 @@ export default function Sidebar() {
   const handleNewChat = () => {
     sessionStorage.removeItem("pendingPrompt");
     router.push("/diagnose");
-    setOpen(false);
+  };
+
+  const toggleSidebar = () => {
+    setCollapsed(!collapsed);
+    if (onClose) onClose(); // ✅ call parent close if provided
   };
 
   return (
     <>
       {/* Toggle button */}
       <button
-        onClick={() => setOpen(!open)}
-        className="fixed top-4 left-4 z-50 p-2 rounded bg-gray-800 hover:bg-gray-700 text-white"
+        onClick={toggleSidebar}
+        className="absolute top-4 left-4 z-50 p-2 rounded bg-gray-800 hover:bg-gray-700 text-white"
       >
-        {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        {collapsed ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
       </button>
-
-      {/* Dark overlay (mobile) */}
-      {open && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
-          onClick={() => setOpen(false)}
-        />
-      )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-gray-800 text-white flex flex-col transform transition-transform duration-300 z-50
-          ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`transition-all duration-300 ease-in-out 
+          ${collapsed ? "w-0" : "w-64"} 
+          bg-gray-800 text-white flex flex-col h-screen overflow-hidden`}
       >
         {/* Header */}
         <div className="p-4 flex items-center justify-between">
@@ -115,24 +122,29 @@ export default function Sidebar() {
         <div className="flex-grow overflow-y-auto px-4">
           <ul className="space-y-2">
             <li>
-              <Link href="/" onClick={() => setOpen(false)}>
+              <Link href="/" className="hover:text-indigo-400 transition-colors">
                 Home
               </Link>
             </li>
             <li>
-              <Link href="/settings" onClick={() => setOpen(false)}>
+              <Link
+                href="/settings"
+                className="hover:text-indigo-400 transition-colors"
+              >
                 Settings
               </Link>
             </li>
             <li>
-              <Link href="/tutorial" onClick={() => setOpen(false)}>
+              <Link
+                href="/tutorial"
+                className="hover:text-indigo-400 transition-colors"
+              >
                 Tutorial
               </Link>
             </li>
           </ul>
 
           <div className="mt-6">
-            {/* History toggle */}
             <button
               onClick={() => setHistoryOpen(!historyOpen)}
               className="flex items-center justify-between text-sm text-gray-400 uppercase w-full hover:text-indigo-400"
@@ -145,7 +157,6 @@ export default function Sidebar() {
               )}
             </button>
 
-            {/* New chat */}
             <button
               onClick={handleNewChat}
               className="w-full mt-3 mb-2 px-2 py-2 flex items-center justify-center gap-2 text-sm rounded bg-indigo-600 hover:bg-indigo-700 font-medium transition-colors"
@@ -153,7 +164,6 @@ export default function Sidebar() {
               <Plus className="w-4 h-4" /> New Chat
             </button>
 
-            {/* History list */}
             {historyOpen && (
               <>
                 {err && (
@@ -162,7 +172,6 @@ export default function Sidebar() {
                     <Link
                       href="/history"
                       className="underline text-indigo-400 hover:text-indigo-300"
-                      onClick={() => setOpen(false)}
                     >
                       View Chat History →
                     </Link>
@@ -191,7 +200,6 @@ export default function Sidebar() {
                                 : "hover:bg-gray-700"
                             }`}
                             title={chat.title || "Untitled Chat"}
-                            onClick={() => setOpen(false)}
                           >
                             {chat.title || "Untitled Chat"}
                           </Link>
@@ -202,7 +210,6 @@ export default function Sidebar() {
                       <Link
                         href="/history"
                         className="block px-2 py-1 text-indigo-400 hover:text-indigo-300 text-sm font-medium"
-                        onClick={() => setOpen(false)}
                       >
                         View all history →
                       </Link>
