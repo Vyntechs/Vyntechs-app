@@ -3,15 +3,9 @@
 
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import {
-  Menu,
-  Plus,
-  LogOut,
-  ChevronDown,
-  ChevronRight,
-  X,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, ChevronDown, ChevronRight } from "lucide-react";
+import Image from "next/image";
 
 interface Chat {
   id: string;
@@ -20,7 +14,7 @@ interface Chat {
 }
 
 interface SidebarProps {
-  onClose?: () => void; // ✅ optional close handler
+  onClose?: () => void;
 }
 
 export default function Sidebar({ onClose }: SidebarProps) {
@@ -30,10 +24,28 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(true);
-  const mounted = useRef(false);
 
+  // 🔐 Check if logged in
+  const checkLogin = async () => {
+    try {
+      const res = await fetch("/api/me", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        setUserEmail(null);
+        return;
+      }
+      const data = await res.json();
+      setUserEmail(data.ok ? data.email || "Logged In" : null);
+    } catch {
+      setUserEmail(null);
+    }
+  };
+
+  // 📡 Fetch chats
   const fetchChats = async () => {
     setLoading(true);
     setErr(null);
@@ -68,83 +80,72 @@ export default function Sidebar({ onClose }: SidebarProps) {
   };
 
   useEffect(() => {
-    if (mounted.current) return;
-    mounted.current = true;
-
-    const storedEmail = localStorage.getItem("user_email") || null;
-    setUserEmail(storedEmail);
-
-    fetchChats();
+    checkLogin();
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      await fetch("/api/logout", { method: "POST" });
-      localStorage.removeItem("user_email");
-      router.push("/login");
-    } catch (err) {
-      console.error("🚨 Logout failed:", err);
+  useEffect(() => {
+    if (userEmail) {
+      fetchChats();
+    } else {
+      setChats([]);
     }
-  };
+  }, [userEmail, pathname]);
 
   const handleNewChat = () => {
     sessionStorage.removeItem("pendingPrompt");
     router.push("/diagnose");
-  };
-
-  const toggleSidebar = () => {
-    setCollapsed(!collapsed);
-    if (onClose) onClose(); // ✅ call parent close if provided
+    if (onClose) onClose();
   };
 
   return (
-    <>
-      {/* Toggle button */}
-      <button
-        onClick={toggleSidebar}
-        className="absolute top-4 left-4 z-50 p-2 rounded bg-gray-800 hover:bg-gray-700 text-white"
-      >
-        {collapsed ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
-      </button>
+    <aside className="bg-gray-800 text-white flex flex-col h-full">
+      {/* Header with Logo */}
+      <div className="p-6 flex items-center justify-center border-b border-gray-700">
+        <Image
+          src="/vyntechs-logo.png" // ✅ correct path (in /public)
+          alt="VynTechs Logo"
+          width={160}
+          height={50}
+          className="object-contain"
+          priority
+        />
+      </div>
 
-      {/* Sidebar */}
-      <aside
-        className={`transition-all duration-300 ease-in-out 
-          ${collapsed ? "w-0" : "w-64"} 
-          bg-gray-800 text-white flex flex-col h-screen overflow-hidden`}
-      >
-        {/* Header */}
-        <div className="p-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold">Auto Repair AI</h2>
-        </div>
+      {/* Nav */}
+      <div className="flex-grow overflow-y-auto px-4 pb-6 mt-6">
+        <ul className="space-y-3">
+          <li>
+            <Link
+              href="/"
+              onClick={onClose}
+              className="hover:text-indigo-400 transition-colors"
+            >
+              Home
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/settings"
+              onClick={onClose}
+              className="hover:text-indigo-400 transition-colors"
+            >
+              Settings
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/tutorial"
+              onClick={onClose}
+              className="hover:text-indigo-400 transition-colors"
+            >
+              Tutorial
+            </Link>
+          </li>
+        </ul>
 
-        {/* Nav + History */}
-        <div className="flex-grow overflow-y-auto px-4">
-          <ul className="space-y-2">
-            <li>
-              <Link href="/" className="hover:text-indigo-400 transition-colors">
-                Home
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/settings"
-                className="hover:text-indigo-400 transition-colors"
-              >
-                Settings
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/tutorial"
-                className="hover:text-indigo-400 transition-colors"
-              >
-                Tutorial
-              </Link>
-            </li>
-          </ul>
-
-          <div className="mt-6">
+        {/* History Section (only when logged in) */}
+        {userEmail && (
+          <div className="mt-10">
             <button
               onClick={() => setHistoryOpen(!historyOpen)}
               className="flex items-center justify-between text-sm text-gray-400 uppercase w-full hover:text-indigo-400"
@@ -159,7 +160,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
 
             <button
               onClick={handleNewChat}
-              className="w-full mt-3 mb-2 px-2 py-2 flex items-center justify-center gap-2 text-sm rounded bg-indigo-600 hover:bg-indigo-700 font-medium transition-colors"
+              className="w-full mt-3 mb-3 px-2 py-2 flex items-center justify-center gap-2 text-sm rounded bg-indigo-600 hover:bg-indigo-700 font-medium transition-colors"
             >
               <Plus className="w-4 h-4" /> New Chat
             </button>
@@ -167,25 +168,16 @@ export default function Sidebar({ onClose }: SidebarProps) {
             {historyOpen && (
               <>
                 {err && (
-                  <div className="text-xs text-red-300">
-                    Couldn’t load chats.{" "}
-                    <Link
-                      href="/history"
-                      className="underline text-indigo-400 hover:text-indigo-300"
-                    >
-                      View Chat History →
-                    </Link>
-                  </div>
+                  <p className="text-xs text-gray-500 px-2">
+                    ⚠ Couldn’t load history
+                  </p>
                 )}
-
                 {!err && chats.length === 0 && !loading && (
                   <p className="text-gray-500 text-xs px-2">No chats yet</p>
                 )}
-
                 {loading && (
-                  <p className="text-xs text-gray-400">Loading…</p>
+                  <p className="text-xs text-gray-400 px-2">Loading…</p>
                 )}
-
                 {!loading && chats.length > 0 && (
                   <ul className="space-y-1 max-h-64 overflow-y-auto pr-1 custom-scroll">
                     {chats.map((chat) => {
@@ -194,6 +186,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
                         <li key={chat.id} className="truncate">
                           <Link
                             href={`/history/${chat.id}`}
+                            onClick={onClose}
                             className={`block px-2 py-1 rounded truncate text-sm transition-colors ${
                               isActive
                                 ? "bg-indigo-600 text-white font-semibold"
@@ -206,37 +199,13 @@ export default function Sidebar({ onClose }: SidebarProps) {
                         </li>
                       );
                     })}
-                    <li className="mt-2">
-                      <Link
-                        href="/history"
-                        className="block px-2 py-1 text-indigo-400 hover:text-indigo-300 text-sm font-medium"
-                      >
-                        View all history →
-                      </Link>
-                    </li>
                   </ul>
                 )}
               </>
             )}
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-700">
-          {userEmail && (
-            <p className="text-xs text-gray-400 mb-2 truncate">
-              Logged in as{" "}
-              <span className="text-gray-200 font-medium">{userEmail}</span>
-            </p>
-          )}
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-semibold transition-colors"
-          >
-            <LogOut className="w-4 h-4" /> Logout
-          </button>
-        </div>
-      </aside>
-    </>
+        )}
+      </div>
+    </aside>
   );
 }

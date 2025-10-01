@@ -14,14 +14,18 @@ export default function LoginPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await fetch("/api/chats", {
+        const res = await fetch("/api/me", {
           method: "GET",
-          credentials: "include", // ✅ ensure cookies are sent
+          credentials: "include",
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.ok !== false) {
-            router.replace("/"); // ✅ send to root, not /home
+          if (data.ok) {
+            if (data.email) {
+              localStorage.setItem("user_email", data.email);
+            }
+            // ✅ Use hard reload so Safari respects cookies
+            window.location.href = "/";
           }
         }
       } catch (err) {
@@ -30,14 +34,14 @@ export default function LoginPage() {
     };
 
     checkAuth();
-  }, [router]);
+  }, []);
 
   const handleUnlock = async (pattern: string) => {
     try {
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // ✅ so cookie is saved in Safari
+        credentials: "include",
         body: JSON.stringify({ email, pattern }),
       });
 
@@ -45,7 +49,26 @@ export default function LoginPage() {
 
       if (data.ok) {
         setError("");
-        router.replace("/"); // ✅ safer than push, replaces history
+        if (data.email) {
+          localStorage.setItem("user_email", data.email);
+        }
+
+        // ✅ Double-check cookie is live
+        const confirm = await fetch("/api/me", {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (confirm.ok) {
+          const user = await confirm.json();
+          if (user.ok) {
+            // ✅ Hard reload for Safari
+            window.location.href = "/";
+            return;
+          }
+        }
+
+        setError("⚠️ Login succeeded but session not confirmed. Try refreshing.");
       } else {
         setError("❌ Incorrect email or pattern, try again.");
       }

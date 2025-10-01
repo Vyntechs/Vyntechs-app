@@ -20,9 +20,12 @@ async function getUserIdFromRequest(req: NextRequest): Promise<string | null> {
 }
 
 // 📡 GET – fetch single chat
-export async function GET(req: NextRequest, context: any) {
+export async function GET(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> } // 👈 make params a Promise
+) {
   try {
-    const { id } = context.params; // ✅ don’t type manually
+    const { id } = await context.params; // 👈 must await
     const userId = await getUserIdFromRequest(req);
 
     if (!userId) {

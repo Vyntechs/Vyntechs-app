@@ -6,4 +6,90 @@
 body {
   @apply bg-gray-900 text-white;
   font-family: sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Ensure full height and prevent iOS overscroll bounce */
+  min-height: 100vh;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
+/* Support iOS safe areas (notch, home bar) */
+html, body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* Responsive text scaling */
+html {
+  font-size: 16px; /* base */
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 15px; /* slightly smaller for phones */
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbars (desktop only) */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #1f2937; /* gray-800 */
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #4b5563; /* gray-600 */
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #6b7280; /* gray-500 */
+  }
+}
+
+/* Mobile: hide scrollbar entirely */
+@media (max-width: 767px) {
+  ::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ---------- MOBILE OPTIMIZATIONS ---------- */
+@media (max-width: 640px) {
+  /* Reduce padding in main content */
+  main {
+    padding: 0.75rem !important; /* ~12px */
+  }
+
+  /* Sidebar tweaks */
+  aside {
+    font-size: 0.9rem; /* slightly smaller text */
+  }
+
+  aside .p-4 {
+    padding: 0.75rem !important;
+  }
+
+  aside button,
+  aside a {
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  /* Chat messages */
+  .chat-message {
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.95rem;
+  }
+
+  /* Headings */
+  h1, h2, h3 {
+    font-size: 90%;
+  }
 }
